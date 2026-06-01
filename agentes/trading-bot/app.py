@@ -63,9 +63,18 @@ st.warning(
     "real, no usa credenciales ni dinero real."
 )
 
-# ---------- Panel de control (sidebar) ----------
+# ---------- Entrada principal (en el cuerpo, siempre visible) ----------
+st.subheader("1. Escribe tu consulta")
+query = st.text_input(
+    "Consulta en lenguaje natural",
+    "tech de mediana capitalización infravalorada con momentum positivo",
+    help="Ej.: 'salud de gran capitalización con momentum positivo'.",
+)
+run_clicked = st.button("🔎 Ejecutar screening", type="primary", use_container_width=True)
+
+# ---------- Parámetros (barra lateral) ----------
 with st.sidebar:
-    st.header("Panel de control")
+    st.header("Parámetros")
 
     broker_choice = st.radio(
         "Broker",
@@ -82,7 +91,6 @@ with st.sidebar:
             paper=alpaca.alpaca_paper,
             trading_allowed=alpaca.trading_allowed,
         )
-    query = st.text_input("Consulta (lenguaje natural)", "tech de mediana capitalización infravalorada con momentum positivo")
     threshold = st.slider("Umbral de score para comprar", 0.0, 10.0, settings.default_score_threshold, 0.1)
     interval = st.number_input("Intervalo (min)", min_value=5, max_value=1440, value=settings.default_interval_minutes)
     max_pct = st.slider("Máx % del portfolio por posición", 0.01, 0.20, settings.default_max_position_pct, 0.01)
@@ -95,40 +103,43 @@ with st.sidebar:
     elif not getattr(broker, "connected", False):
         st.info("Sin claves de Alpaca: las órdenes se simulan (no se ejecutan).")
 
-    config = BotConfig(
-        query=query, score_threshold=threshold, max_position_pct=max_pct,
-        interval_minutes=int(interval), max_open_positions=int(max_positions),
-        paper=alpaca.alpaca_paper, live_trading_enabled=alpaca.enable_live_trading,
-    )
-    bot = TradingBot(
-        config=config, broker=broker, cache=cache, store=store,
-        anthropic_client=anthropic_client,
-        planner_model=settings.model_planner, reasoner_model=settings.model_reasoner,
-    )
+config = BotConfig(
+    query=query, score_threshold=threshold, max_position_pct=max_pct,
+    interval_minutes=int(interval), max_open_positions=int(max_positions),
+    paper=alpaca.alpaca_paper, live_trading_enabled=alpaca.enable_live_trading,
+)
+bot = TradingBot(
+    config=config, broker=broker, cache=cache, store=store,
+    anthropic_client=anthropic_client,
+    planner_model=settings.model_planner, reasoner_model=settings.model_reasoner,
+)
 
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("▶️ Ejecutar ahora", use_container_width=True):
-            with st.spinner("Ejecutando ciclo..."):
-                st.session_state.last_record = bot.run_once()
-            st.success("Ciclo completado.")
-    with col2:
-        if not st.session_state.scheduler.running:
-            if st.button("⏱️ Activar bot", use_container_width=True):
-                st.session_state.scheduler.start(
-                    bot, int(interval),
-                    on_run=lambda rec: st.session_state.__setitem__("last_record", rec),
-                )
-                st.success(f"Bot activo (cada {interval} min).")
-        else:
-            if st.button("⏸️ Pausar bot", use_container_width=True):
-                st.session_state.scheduler.stop()
-                st.info("Bot pausado.")
+# Ejecuta el screening al pulsar el botón principal.
+if run_clicked:
+    with st.spinner("Ejecutando screening..."):
+        st.session_state.last_record = bot.run_once()
+    st.success("Screening completado. Revisa la pestaña 🔎 Screening.")
 
+# ---------- Bot periódico (barra lateral) ----------
+with st.sidebar:
+    st.divider()
+    st.subheader("Bot periódico")
+    if not st.session_state.scheduler.running:
+        if st.button("⏱️ Activar bot", use_container_width=True):
+            st.session_state.scheduler.start(
+                bot, int(interval),
+                on_run=lambda rec: st.session_state.__setitem__("last_record", rec),
+            )
+            st.success(f"Bot activo (cada {interval} min).")
+    else:
+        if st.button("⏸️ Pausar bot", use_container_width=True):
+            st.session_state.scheduler.stop()
+            st.info("Bot pausado.")
     st.caption(f"Estado: {'🟢 activo' if st.session_state.scheduler.running else '⚪ inactivo'}")
 
 
 # ---------- Cuerpo: cuenta, posiciones, órdenes, equity, logs ----------
+st.subheader("2. Cartera y resultados")
 account = broker.get_account()
 positions = broker.get_positions()
 
