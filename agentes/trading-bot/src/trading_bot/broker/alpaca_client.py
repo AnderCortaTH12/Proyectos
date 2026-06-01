@@ -8,9 +8,10 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from ..models import Account, Order, OrderRequest, OrderSide, OrderStatus, OrderType, Position
+from .broker_interface import BrokerInterface
 
 
-class AlpacaBroker:
+class AlpacaBroker(BrokerInterface):
     """Cliente de trading sobre Alpaca; admite inyección de cliente para tests."""
 
     def __init__(

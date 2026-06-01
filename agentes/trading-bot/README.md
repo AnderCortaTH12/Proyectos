@@ -10,6 +10,11 @@ el sistema la interpreta, recopila datos reales, filtra y puntúa candidatos,
 justifica cada elección anclada a los datos, y —si el score supera un umbral—
 ejecuta una orden respetando reglas de gestión de riesgo.
 
+El **broker es enchufable** (patrón template): por defecto usa un **MockBroker**
+100% local (cartera simulada de $100k, **sin credenciales ni dinero real**), y
+opcionalmente un **AlpacaBroker** (paper). Puedes probar el bot de extremo a
+extremo sin ninguna API key de broker.
+
 > ## ⚠️ Disclaimer
 > Proyecto **educativo / de portfolio**. **NO es asesoramiento financiero** ni
 > una recomendación de inversión. Las heurísticas de puntuación son
@@ -53,7 +58,7 @@ Streamlit: posiciones, P&L, órdenes, equity curve, logs/traza del agente
 | `screener/tools/` | `get_universe`, `get_fundamentals`, `get_technicals`, benchmarks. Caché DuckDB + backoff. |
 | `screener/engine/` | Filtros duros y puntuación ponderada 0–10. |
 | `screener/reasoning/` | Justificación (Sonnet) + **guardrail** anti-alucinaciones numéricas. |
-| `broker/` | Wrapper de Alpaca y gestión de riesgo (sizing, duplicados). |
+| `broker/` | Interfaz abstracta `BrokerInterface` (template), `MockBroker` (simulado, por defecto), `AlpacaBroker` (paper) y gestión de riesgo (sizing, duplicados). |
 | `bot/` | Orquestador (screening→decisión→ejecución) y scheduler periódico (APScheduler). |
 | `store/` | Persistencia en DuckDB: ejecuciones, órdenes, equity curve. |
 | `app.py` | UI Streamlit. |
@@ -101,7 +106,21 @@ docker build -t trading-bot .
 docker run --env-file .env -p 8501:8501 trading-bot
 ```
 
-## Paper vs. dinero real (doble cerrojo)
+## Brokers (template + MockBroker)
+
+El bot habla con cualquier broker que implemente `BrokerInterface`
+(`get_account`, `get_positions`, `get_orders`, `place_order`):
+
+- **`MockBroker` (por defecto):** cartera simulada en memoria con $100k. Simula
+  las ejecuciones a precio de mercado, calcula P&L en tiempo real y **no se
+  conecta a ningún broker real ni usa credenciales**. Ideal para demo y tests.
+- **`AlpacaBroker` (opcional):** ejecuta en Alpaca (paper por defecto). Requiere
+  claves; ver más abajo.
+
+En la UI puedes cambiar de broker con el selector del panel lateral. El
+predeterminado es el simulado.
+
+## Paper vs. dinero real (doble cerrojo, solo AlpacaBroker)
 
 Por seguridad, para enviar órdenes **reales** no basta con desactivar paper:
 

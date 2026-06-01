@@ -14,7 +14,7 @@ import streamlit as st  # noqa: E402
 
 from config import get_alpaca_settings, get_settings  # noqa: E402
 from trading_bot.bot import BotScheduler, TradingBot  # noqa: E402
-from trading_bot.broker.alpaca_client import AlpacaBroker  # noqa: E402
+from trading_bot.broker import AlpacaBroker, MockBroker  # noqa: E402
 from trading_bot.models import BotConfig  # noqa: E402
 from trading_bot.screener.tools.cache import DataCache  # noqa: E402
 from trading_bot.store import TradeLog  # noqa: E402
@@ -38,16 +38,16 @@ def get_components():
             anthropic_client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
         except Exception:
             anthropic_client = None
-    broker = AlpacaBroker(
-        api_key=alpaca.alpaca_api_key,
-        secret_key=alpaca.alpaca_secret_key,
-        paper=alpaca.alpaca_paper,
-        trading_allowed=alpaca.trading_allowed,
-    )
-    return cache, store, anthropic_client, broker
+    return cache, store, anthropic_client
 
 
-cache, store, anthropic_client, broker = get_components()
+@st.cache_resource
+def get_mock_broker() -> MockBroker:
+    """MockBroker persistente entre reruns (cartera simulada de $100k)."""
+    return MockBroker(starting_cash=100_000.0)
+
+
+cache, store, anthropic_client = get_components()
 
 if "scheduler" not in st.session_state:
     st.session_state.scheduler = BotScheduler()
@@ -56,17 +56,32 @@ if "last_record" not in st.session_state:
 
 
 # ---------- Cabecera y disclaimer ----------
-st.title("📈 Trading Bot Agéntico + Alpaca")
-mode = "PAPER (simulado)" if alpaca.alpaca_paper else ("REAL ⚠️" if alpaca.is_live else "BLOQUEADO")
+st.title("📈 Trading Bot Agéntico")
 st.warning(
     "**Proyecto demostrativo — NO es asesoramiento financiero.** "
-    f"Modo actual: **{mode}**. "
-    "Para operar con dinero real se requieren `ALPACA_PAPER=false` Y `ENABLE_LIVE_TRADING=true`."
+    "Por defecto usa un **broker simulado (MockBroker)**: no conecta a ningún broker "
+    "real, no usa credenciales ni dinero real."
 )
 
 # ---------- Panel de control (sidebar) ----------
 with st.sidebar:
     st.header("Panel de control")
+
+    broker_choice = st.radio(
+        "Broker",
+        ["Simulado (MockBroker)", "Alpaca (paper)"],
+        index=0,
+        help="El simulado no requiere credenciales ni red de broker.",
+    )
+    if broker_choice.startswith("Simulado"):
+        broker = get_mock_broker()
+    else:
+        broker = AlpacaBroker(
+            api_key=alpaca.alpaca_api_key,
+            secret_key=alpaca.alpaca_secret_key,
+            paper=alpaca.alpaca_paper,
+            trading_allowed=alpaca.trading_allowed,
+        )
     query = st.text_input("Consulta (lenguaje natural)", "tech de mediana capitalización infravalorada con momentum positivo")
     threshold = st.slider("Umbral de score para comprar", 0.0, 10.0, settings.default_score_threshold, 0.1)
     interval = st.number_input("Intervalo (min)", min_value=5, max_value=1440, value=settings.default_interval_minutes)
@@ -75,7 +90,9 @@ with st.sidebar:
 
     if not anthropic_client:
         st.info("Sin ANTHROPIC_API_KEY: el screener usa el parser/razonamiento de respaldo (heurístico).")
-    if not broker.connected:
+    if isinstance(broker, MockBroker):
+        st.caption("🧪 Broker simulado: cartera ficticia de $100k, sin conexión real.")
+    elif not getattr(broker, "connected", False):
         st.info("Sin claves de Alpaca: las órdenes se simulan (no se ejecutan).")
 
     config = BotConfig(

@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from ..broker.alpaca_client import AlpacaBroker
+from ..broker.broker_interface import BrokerInterface
 from ..broker.risk import decide_trade
 from ..logging_conf import get_logger, log_event
 from ..models import (
@@ -27,7 +27,7 @@ class TradingBot:
     def __init__(
         self,
         config: BotConfig,
-        broker: AlpacaBroker,
+        broker: BrokerInterface,
         cache: Optional[DataCache] = None,
         store: Optional[TradeLog] = None,
         anthropic_client=None,
