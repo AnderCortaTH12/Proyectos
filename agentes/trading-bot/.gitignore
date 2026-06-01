@@ -1,0 +1,19 @@
+# Entorno y secretos
+.env
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Datos / caché generados en runtime
+data/
+*.duckdb
+*.duckdb.wal
+
+# Sistema
+.DS_Store

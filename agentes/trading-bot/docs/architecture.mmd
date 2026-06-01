@@ -1,0 +1,30 @@
+flowchart TD
+    U[Usuario: consulta NL + threshold] --> APP[Streamlit app.py]
+    APP -->|play/pause, config| SCHED[Scheduler APScheduler]
+    SCHED -->|cada N min| BOT[TradingBot orquestador]
+
+    subgraph Screener
+      BOT --> PLAN[Planner Haiku]
+      PLAN -->|ScreenCriteria| UNI[get_universe]
+      UNI --> DL[Descarga paralela asyncio]
+      DL --> FUN[get_fundamentals]
+      DL --> TEC[get_technicals]
+      DL --> BEN[get_sector_benchmarks]
+      FUN & TEC & BEN --> CACHE[(Cache DuckDB TTL)]
+      FUN & TEC & BEN --> FILT[Filtros duros]
+      FILT --> SCORE[Scoring 0-10]
+      SCORE --> REAS[Reasoner Sonnet]
+      REAS --> GUARD[Guardrail: verifica numeros]
+    end
+
+    GUARD -->|candidatos score>umbral| RISK[Risk: sizing max 5% + anti-duplicado]
+    RISK -->|OrderRequest| ALP[Alpaca client paper]
+    ALP --> ORD[(Orden ejecutada)]
+    BOT --> LOG[(TradeLog DuckDB: ordenes, decisiones, equity)]
+
+    ORD --> APP
+    LOG --> APP
+    APP --> POS[Posiciones + P&L]
+    APP --> HIST[Historico de ordenes]
+    APP --> EQ[Equity curve]
+    APP --> TRACE[Logs/traza del agente]
