@@ -9,7 +9,6 @@ dependencies = [
     "yfinance>=0.2.40",
     "pandas>=2.0",
     "numpy>=1.26",
-    "pandas-ta>=0.3.14b0",
     "duckdb>=1.0",
     "pydantic>=2.6",
     "pydantic-settings>=2.2",
